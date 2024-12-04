@@ -1,0 +1,136 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>خريطة المستخدمين</title>
+    <!-- استيراد مكتبة Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- استيراد Firebase 9 وما فوق -->
+    <script type="module">
+        // إعداد Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.2/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.17.2/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAiEgF-fRwvqjg4stEmS-ibinQOtWKUq98",
+            authDomain: "sssssss-9bf61.firebaseapp.com",
+            databaseURL: "https://sssssss-9bf61-default-rtdb.firebaseio.com",
+            projectId: "sssssss-9bf61",
+            storageBucket: "sssssss-9bf61.firebasestorage.app",
+            messagingSenderId: "372703402719",
+            appId: "1:372703402719:web:4db524ad49e385205d276a",
+            measurementId: "G-HXPM6L2JM9"
+        };
+
+        // تهيئة التطبيق
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const usersRef = ref(database, 'users');
+
+        // إنشاء الخريطة
+        const map = L.map('map').setView([0, 0], 2); // الإعداد الافتراضي
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // متغير لتخزين موقع المستخدم
+        let userLocation = null;
+
+        // دالة لتحديد الموقع (يتم تنفيذها فقط إذا لم يكن قد تم تحديد الموقع من قبل)
+        function locateUserAndUpdateMap() {
+            if (userLocation) {
+                return userLocation; // إذا كان الموقع قد تم تحديده مسبقًا، استخدمه مباشرة
+            }
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+
+                        // عرض موقع المستخدم على الخريطة
+                        L.marker([userLocation.lat, userLocation.lng]).addTo(map)
+                            .bindPopup("أنت هنا").openPopup();
+                        map.setView([userLocation.lat, userLocation.lng], 12);
+                    },
+                    error => {
+                        alert("لم يتم تحديد الموقع. تأكد من أنك قد منحت الإذن باستخدام الموقع.");
+                    },
+                    { enableHighAccuracy: true }
+                );
+            } else {
+                alert("الموقع الجغرافي غير مدعوم على هذا المتصفح.");
+            }
+        }
+
+        // عرض موقع المستخدم عند دخول الصفحة (أو عند أول تحديد للموقع)
+        window.onload = function () {
+            locateUserAndUpdateMap(); // تحديد موقع المستخدم عند الدخول
+        };
+
+        // إضافة موقع المستخدم الجديد عند الضغط على الزر
+        document.getElementById('locate-btn').addEventListener('click', () => {
+            const username = document.getElementById('username').value.trim();
+
+            if (!username) {
+                alert("يرجى إدخال اسمك قبل تحديد موقعك.");
+                return;
+            }
+
+            if (!userLocation) {
+                locateUserAndUpdateMap(); // إذا لم يكن الموقع قد تم تحديده مسبقًا
+            }
+
+            if (userLocation) {
+                // عرض موقع المستخدم على الخريطة
+                L.marker([userLocation.lat, userLocation.lng]).addTo(map)
+                    .bindPopup(`${username} (أنت هنا)`).openPopup();
+
+                // إرسال البيانات إلى Firebase
+                push(usersRef, {
+                    name: username,
+                    location: userLocation
+                });
+            }
+        });
+
+        // عرض مواقع المستخدمين الآخرين عند إضافتهم في Firebase
+        onChildAdded(usersRef, (snapshot) => {
+            const user = snapshot.val();
+            const userLocation = [user.location.lat, user.location.lng];
+
+            // إضافة علامة على موقع المستخدم الآخر
+            L.marker(userLocation).addTo(map)
+                .bindPopup(user.name);
+        });
+    </script>
+    <style>
+        /* تصميم الخريطة */
+        #map {
+            height: 80vh;
+            width: 100%;
+            margin-top: 20px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>خريطة المستخدمين</h1>
+    <input type="text" id="username" placeholder="أدخل اسمك" required />
+    <button id="locate-btn">اضغط لتحديد موقعك</button>
+    <div id="map"></div>
+</body>
+</html>
